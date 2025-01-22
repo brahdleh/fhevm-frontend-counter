@@ -2,6 +2,28 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+  await hre.network.provider.send("hardhat_reset");
+  const { deployer } = await hre.getNamedAccounts();
+  const { deploy, getOrNull } = hre.deployments;
+
+  // Check if contract was previously deployed
+  //const existingDeployment = await getOrNull("EncryptedCounter");
+  //const isNewDeployment = !existingDeployment;
+
+  const deployed = await deploy("EncryptedCounter", {
+    from: deployer,
+    args: [],
+    log: true,
+  });
+
+};
+
+export default func;
+func.id = "deploy_EncryptedCounter"; // id required to prevent reexecution
+func.tags = ["EncryptedCounter"];
+
+/*
+const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await hre.getNamedAccounts();
   const { deploy, getOrNull } = hre.deployments;
 
@@ -30,3 +52,4 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 export default func;
 func.id = "deploy_confidentialERC20"; // id required to prevent reexecution
 func.tags = ["MyConfidentialERC20"];
+*/
