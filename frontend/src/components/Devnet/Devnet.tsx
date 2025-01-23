@@ -1,18 +1,15 @@
 import { useEffect, useState } from 'react';
 import { getInstance } from '../../fhevmjs';
+import { ethers, Provider, ZeroAddress } from 'ethers';
+import { reencryptEuint8 } from '../../../../hardhat/test/reencrypt.ts';
+import encryptedCounterLocal from '../../../../hardhat/deployments/localhost/EncryptedCounter.json';
+// ^ Adjust path as needed to point to your local EncryptedCounter.json
+
 import './Devnet.css';
-import { Eip1193Provider, Provider, ZeroAddress } from 'ethers';
-import { ethers } from 'ethers';
 
-import { reencryptEuint64 } from '../../../../hardhat/test/reencrypt.ts';
-
-const toHexString = (bytes: Uint8Array) =>
-  '0x' +
-  bytes.reduce((str, byte) => str + byte.toString(16).padStart(2, '0'), '');
-
-export type DevnetProps = {
+type DevnetProps = {
   account: string;
-  provider: Provider; //Eip1193Provider;
+  provider: Provider;
   readOnlyProvider: Provider;
 };
 
@@ -23,233 +20,144 @@ export const Devnet = ({
 }: DevnetProps) => {
   const [contractAddress, setContractAddress] = useState(ZeroAddress);
 
-  const [handleBalance, setHandleBalance] = useState('???');
+  const [handleBalance, setHandleBalance] = useState('???');     // The euint8 handle (encrypted)
   const [decryptedBalance, setDecryptedBalance] = useState('???');
 
+  const [inputValue, setInputValue] = useState('0'); // The user input in numeric form
   const [handles, setHandles] = useState<Uint8Array[]>([]);
   const [encryption, setEncryption] = useState<Uint8Array>();
 
-  const [inputValue, setInputValue] = useState(''); // Track the input
-  const [chosenValue, setChosenValue] = useState('0'); // Track the confirmed value
-  /*
-  const [inputValueAddress, setInputValueAddress] = useState('');
-  const [chosenAddress, setChosenAddress] = useState('0x');
-  const [errorMessage, setErrorMessage] = useState('');
-
-  const [decryptedSecret, setDecryptedResult] = useState('???');
-  */
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        // Conditional import based on MOCKED environment variable
-        let EncryptedCounter;
-        if (!import.meta.env.MOCKED) {
-          EncryptedCounter = await import(
-            '@deployments/sepolia/EncryptedCounter.json'
-          );
-          console.log(
-            `Using ${EncryptedCounter.address} for the token address on Sepolia`,
-          );
-        } else {
-          EncryptedCounter = await import(
-            '../../../../hardhat/deployments/localhost/EncryptedCounter.json', //'@deployments/localhost/EncryptedCounter.json'
-          );
-          console.log(
-            `Using ${EncryptedCounter.address} for the token address on Hardhat Local Node`,
-          );
-        }
-
-        setContractAddress(EncryptedCounter.address);
-      } catch (error) {
-        console.error(
-          'Error loading data - you probably forgot to deploy the token contract before running the front-end server:',
-          error,
-        );
-      }
-    };
-
-    loadData();
-  }, []);
-
-  const handleConfirmAmount = () => {
-    setChosenValue(inputValue);
-  };
-  /*
-  const handleConfirmAddress = () => {
-    const trimmedValue = inputValueAddress.trim().toLowerCase();
-    if (ethers.isAddress(trimmedValue)) {
-      // getAddress returns the checksummed address
-      const checksummedAddress = ethers.getAddress(trimmedValue);
-      setChosenAddress(checksummedAddress);
-      setErrorMessage('');
-    } else {
-      setChosenAddress('0x');
-      setErrorMessage('Invalid Ethereum address.');
-    }
-  };
-  */
+  // Grab the FHE instance
   const instance = getInstance();
 
+  useEffect(() => {
+    // On mount, retrieve the contract address from the local artifact
+    // If you want to switch networks, handle that logic here.
+    setContractAddress(encryptedCounterLocal.address);
+  }, []);
+
+  // 1) Read the handle (encrypted counter) from the chain
   const getHandleBalance = async () => {
-    if (contractAddress != ZeroAddress) {
+    if (contractAddress !== ZeroAddress) {
+      // Using read-only provider for calls
       const contract = new ethers.Contract(
         contractAddress,
-        ['function getCounter() view returns (euint8)'],
+        ['function getCounter() view returns (uint256)'],
         readOnlyProvider,
       );
-      const handleBalance = await contract.getCounter();
-      setHandleBalance(handleBalance.toString());
+      const res = await contract.getCounter();
+      setHandleBalance(res.toString()); // The euint8 handle
       setDecryptedBalance('???');
     }
   };
 
   useEffect(() => {
+    // Retrieve the latest handle whenever account or contract changes
     getHandleBalance();
-  }, [account, provider, contractAddress]);
+  }, [account, contractAddress]);
 
-
+  // 2) Encrypt an integer locally
   const encrypt = async (val: bigint) => {
-    const now = Date.now();
     try {
+      // The Zama FHE instance can build an encrypted input 
+      // that can be passed to your contract’s "incrementBy(einput, bytes)"
       const result = await instance
         .createEncryptedInput(contractAddress, account)
-        .add64(val)
+        .add64(val) // or add8, etc. (note that your contract is euint8)
         .encrypt();
-      console.log(`Took ${(Date.now() - now) / 1000}s`);
+
       setHandles(result.handles);
       setEncryption(result.inputProof);
     } catch (e) {
       console.error('Encryption error:', e);
-      console.log(Date.now() - now);
     }
   };
 
-  const Increment = async (val: bigint) => {
-    if (contractAddress != ZeroAddress) {
+  // 3) Write to the contract: increment the counter
+  const increment = async () => {
+    if (contractAddress !== ZeroAddress && handles.length && encryption) {
       const contract = new ethers.Contract(
         contractAddress,
-        ['function incrementBy(einput, bytes) public'],
-        readOnlyProvider,
+        ['function incrementBy(bytes32, bytes) public'],
+        provider.getSigner(account) // IMPORTANT: use a signer
       );
-      encrypt(val);
-      await contract.incrementBy(handles[0], encryption);
+      const tx = await contract.incrementBy(handles[0], encryption);
+      await tx.wait();
+
+      // Refresh the euint8 handle from chain
       await getHandleBalance();
     }
   };
 
+  // 4) Decrypt locally by re‐encrypting or calling a helper
+  //    (This is pseudo-code. Adapt it to your actual reencrypt / decrypt approach.)
   const decrypt = async () => {
-    const signer = await provider.getSigner();
     try {
-      const clearBalance = await reencryptEuint64(
-        signer,
-        instance,
-        BigInt(handleBalance),
-        contractAddress,
+      const clearBalance = await reencryptEuint8(
+          provider.getSigner(account),
+          instance,
+          BigInt(handleBalance),
+          contractAddress
       );
+
       setDecryptedBalance(clearBalance.toString());
-    } catch (error) {
-      if (error === 'Handle is not initialized') {
-        // if handle is uninitialized - i.e equal to 0 - we know for sure that the balance is null
+    } catch (error: any) {
+      if (error.message?.includes('Handle is not initialized')) {
+        // If handle is uninitialized = 0 => user’s balance is 0
         setDecryptedBalance('0');
       } else {
-        throw error;
+        console.error('Decryption error:', error);
       }
     }
   };
-  /*
-  const transferToken = async () => {
-    const contract = new ethers.Contract(
-      contractAddress,
-      ['function transfer(address,bytes32,bytes) external returns (bool)'],
-      provider,
-    );
-    const signer = await provider.getSigner();
-    const tx = await contract
-      .connect(signer)
-      .transfer(
-        chosenAddress,
-        toHexString(handles[0]),
-        toHexString(encryption),
-      );
-    await tx.wait();
-    await getHandleBalance();
-  };
-  
-  const decryptSecret = async () => {
-    const contract = new ethers.Contract(
-      contractAddress,
-      ['function requestSecret() external'],
-      provider,
-    );
-    const signer = await provider.getSigner();
-    const tx = await contract.connect(signer).requestSecret();
-    await tx.wait();
-  };
-
-  const refreshSecret = async () => {
-    const contract = new ethers.Contract(
-      contractAddress,
-      ['function revealedSecret() view returns(uint64)'],
-      readOnlyProvider,
-    );
-    const revealedSecret = await contract.revealedSecret();
-    const revealedSecretString =
-      revealedSecret === 0n ? '???' : revealedSecret.toString();
-    setDecryptedResult(revealedSecretString);
-  };
-  */
 
   return (
     <div>
+      <h2>My Encrypted Counter</h2>
       <dl>
-        <dt className="Devnet__title">My encrypted balance is:</dt>
-        <dd className="Devnet__dd">{handleBalance.toString()}</dd>
+        <dt>Encrypted Value (handle):</dt>
+        <dd>{handleBalance}</dd>
 
-        <button onClick={() => decrypt()}>
-          Reencrypt and decrypt my balance
-        </button>
-        <dd className="Devnet__dd">
-          My decrypted private balance is: {decryptedBalance.toString()}
-        </dd>
-
-        <dd className="Devnet__dd">Chose an amount to add:</dd>
-
-        <div>
-          <input
-            type="number"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Enter a number"
-          />{' '}
-          <button onClick={handleConfirmAmount}>OK</button>
-          {chosenValue !== null && (
-            <div>
-              <p>You chose: {chosenValue}</p>
-            </div>
-          )}
-        </div>
-
-        <button onClick={() => encrypt(BigInt(chosenValue))}>
-          Encrypt {chosenValue}
-        </button>
-        <button onClick={() => Increment(BigInt(chosenValue))}>
-          Add to Balance {chosenValue}
-        </button>
-        <dd className="Devnet__dd">
-          <pre className="Devnet__pre">
-            Handle: {handles.length ? toHexString(handles[0]) : ''}
-          </pre>
-          <pre className="Devnet__pre">
-            Input Proof: {encryption ? toHexString(encryption) : ''}
-          </pre>
-          <pre className="Devnet__pre">
-            Contract Address: {contractAddress}
-          </pre>
-          <pre className="Devnet__pre">
-            Account: {account}
-          </pre>
-        </dd>
+        <dt>Decrypted Value:</dt>
+        <dd>{decryptedBalance}</dd>
       </dl>
+
+      <button onClick={decrypt}>Decrypt My Counter</button>
+
+      <hr />
+
+      <div>
+        <label>Increment Amount:</label>
+        <input
+          type="number"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+        />
+        <button onClick={() => encrypt(BigInt(inputValue))}>
+          Encrypt
+        </button>
+        <button onClick={() => increment()}>
+          Increment
+        </button>
+      </div>
+        <details>
+          <summary>Debug</summary>
+          <pre>Contract: {contractAddress}</pre>
+          <pre>Account:  {account}</pre>
+          <pre>Handle:   {handles.length ? '0x' + Buffer.from(handles[0]).toString('hex') : ''}</pre>
+          <pre>Proof:    {encryption ? '0x' + Buffer.from(encryption).toString('hex') : ''}</pre>
+          </details>
+      <hr />
     </div>
   );
 };
+
+/*
+<details>
+        <summary>Debug</summary>
+        <pre>Contract: {contractAddress}</pre>
+        <pre>Account:  {account}</pre>
+        <pre>Handle:   {handles.length ? '0x' + Buffer.from(handles[0]).toString('hex') : ''}</pre>
+        <pre>Proof:    {encryption ? '0x' + Buffer.from(encryption).toString('hex') : ''}</pre>
+</details>
+*/
