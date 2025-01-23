@@ -31,35 +31,35 @@ export const Devnet = ({
 
   const [inputValue, setInputValue] = useState(''); // Track the input
   const [chosenValue, setChosenValue] = useState('0'); // Track the confirmed value
-
+  /*
   const [inputValueAddress, setInputValueAddress] = useState('');
   const [chosenAddress, setChosenAddress] = useState('0x');
   const [errorMessage, setErrorMessage] = useState('');
 
   const [decryptedSecret, setDecryptedResult] = useState('???');
-
+  */
   useEffect(() => {
     const loadData = async () => {
       try {
         // Conditional import based on MOCKED environment variable
-        let MyConfidentialERC20;
+        let EncryptedCounter;
         if (!import.meta.env.MOCKED) {
-          MyConfidentialERC20 = await import(
-            '@deployments/sepolia/MyConfidentialERC20.json'
+          EncryptedCounter = await import(
+            '@deployments/sepolia/EncryptedCounter.json'
           );
           console.log(
-            `Using ${MyConfidentialERC20.address} for the token address on Sepolia`,
+            `Using ${EncryptedCounter.address} for the token address on Sepolia`,
           );
         } else {
-          MyConfidentialERC20 = await import(
-            '@deployments/localhost/MyConfidentialERC20.json'
+          EncryptedCounter = await import(
+            '../../../../hardhat/deployments/localhost/EncryptedCounter.json', //'@deployments/localhost/EncryptedCounter.json'
           );
           console.log(
-            `Using ${MyConfidentialERC20.address} for the token address on Hardhat Local Node`,
+            `Using ${EncryptedCounter.address} for the token address on Hardhat Local Node`,
           );
         }
 
-        setContractAddress(MyConfidentialERC20.address);
+        setContractAddress(EncryptedCounter.address);
       } catch (error) {
         console.error(
           'Error loading data - you probably forgot to deploy the token contract before running the front-end server:',
@@ -74,7 +74,7 @@ export const Devnet = ({
   const handleConfirmAmount = () => {
     setChosenValue(inputValue);
   };
-
+  /*
   const handleConfirmAddress = () => {
     const trimmedValue = inputValueAddress.trim().toLowerCase();
     if (ethers.isAddress(trimmedValue)) {
@@ -87,7 +87,7 @@ export const Devnet = ({
       setErrorMessage('Invalid Ethereum address.');
     }
   };
-
+  */
   const instance = getInstance();
 
   const getHandleBalance = async () => {
@@ -106,6 +106,7 @@ export const Devnet = ({
   useEffect(() => {
     getHandleBalance();
   }, [account, provider, contractAddress]);
+
 
   const encrypt = async (val: bigint) => {
     const now = Date.now();
@@ -142,7 +143,7 @@ export const Devnet = ({
       }
     }
   };
-
+  /*
   const transferToken = async () => {
     const contract = new ethers.Contract(
       contractAddress,
@@ -160,7 +161,7 @@ export const Devnet = ({
     await tx.wait();
     await getHandleBalance();
   };
-
+  
   const decryptSecret = async () => {
     const contract = new ethers.Contract(
       contractAddress,
@@ -183,6 +184,7 @@ export const Devnet = ({
       revealedSecret === 0n ? '???' : revealedSecret.toString();
     setDecryptedResult(revealedSecretString);
   };
+  */
 
   return (
     <div>
@@ -228,51 +230,6 @@ export const Devnet = ({
             Input Proof: {encryption ? toHexString(encryption) : ''}
           </pre>
         </dd>
-
-        <div>
-          <input
-            type="text"
-            value={inputValueAddress}
-            onChange={(e) => setInputValueAddress(e.target.value)}
-            placeholder="Receiver address"
-          />
-          <button onClick={handleConfirmAddress}>OK</button>{' '}
-          {chosenAddress && (
-            <div>
-              <p>Chosen Address For Receiver: {chosenAddress}</p>
-            </div>
-          )}
-          {errorMessage && (
-            <div style={{ color: 'red' }}>
-              <p>{errorMessage}</p>
-            </div>
-          )}
-        </div>
-
-        <div>
-          {chosenAddress !== '0x' && encryption && encryption.length > 0 && (
-            <button onClick={transferToken}>
-              Transfer Encrypted Amount To Receiver
-            </button>
-          )}
-        </div>
-
-        <div>
-          <button onClick={decryptSecret} disabled={decryptedSecret !== '???'}>
-            Request Secret Decryption
-          </button>
-        </div>
-        <div>
-          <dd className="Devnet__dd">
-            The decrypted secret value is: {decryptedSecret}{' '}
-            <button
-              onClick={refreshSecret}
-              disabled={decryptedSecret !== '???'}
-            >
-              Refresh Decrypted Secret
-            </button>
-          </dd>
-        </div>
       </dl>
     </div>
   );
