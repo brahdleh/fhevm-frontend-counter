@@ -7,8 +7,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deploy, getOrNull } = hre.deployments;
 
   // Check if contract was previously deployed
-  //const existingDeployment = await getOrNull("EncryptedCounter");
-  //const isNewDeployment = !existingDeployment;
+  const existingDeployment = await getOrNull("EncryptedCounter");
+  const isNewDeployment = !existingDeployment;
 
   const deployed = await deploy("EncryptedCounter", {
     from: deployer,
@@ -16,6 +16,12 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     log: true,
   });
 
+  console.log(`MyConfidentialERC20 contract: `, deployed.address);
+  if (isNewDeployment) {
+    console.log(`New Encrypted Counter deployed`);
+  } else {
+    console.log(`Encrypted Counter already deployed`)
+  }
 };
 
 export default func;

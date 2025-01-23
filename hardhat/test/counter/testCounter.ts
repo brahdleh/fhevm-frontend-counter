@@ -1,7 +1,6 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
-// imported from hardhat?
 import { createInstance } from "../instance";
 import { reencryptEuint8 } from "../reencrypt";
 import { getSigners, initSigners } from "../signers";
