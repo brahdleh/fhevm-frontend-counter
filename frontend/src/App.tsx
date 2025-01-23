@@ -19,7 +19,7 @@ function App() {
 
   if (!isInitialized) return null;
 
-  const provider = new JsonRpcProvider('http://127.0.0.1:4173/')
+  const provider = new JsonRpcProvider('http://127.0.0.1:8545/');
 
   return (
     <>
