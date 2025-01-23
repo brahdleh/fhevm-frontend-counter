@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 import "fhevm/lib/TFHE.sol";
+import "fhevm/config/ZamaGatewayConfig.sol";
+import "fhevm/gateway/GatewayCaller.sol";
 import { SepoliaZamaFHEVMConfig } from "fhevm/config/ZamaFHEVMConfig.sol";
 
 /// @title EncryptedCounter
@@ -9,7 +11,10 @@ import { SepoliaZamaFHEVMConfig } from "fhevm/config/ZamaFHEVMConfig.sol";
 /// @dev Uses TFHE library for fully homomorphic encryption operations
 /// @custom:security Each user can only access and modify their own counter
 /// @custom:experimental This contract is experimental and uses FHE technology
-contract EncryptedCounter is SepoliaZamaFHEVMConfig {
+contract EncryptedCounter is 
+    SepoliaZamaGatewayConfig,
+    GatewayCaller,
+    SepoliaZamaFHEVMConfig {
     // Mapping from user address to their encrypted counter value
     mapping(address => euint8) private counters;
 

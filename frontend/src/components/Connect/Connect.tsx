@@ -70,6 +70,7 @@ export const Connect: React.FC<{
   };
 
   useEffect(() => {
+
     const eth = window.ethereum;
     if (!eth) {
       setError('No wallet has been found');

@@ -12,7 +12,7 @@ const toHexString = (bytes: Uint8Array) =>
 
 export type DevnetProps = {
   account: string;
-  provider: Eip1193Provider;
+  provider: Provider; //Eip1193Provider;
   readOnlyProvider: Provider;
 };
 
@@ -23,7 +23,7 @@ export const Devnet = ({
 }: DevnetProps) => {
   const [contractAddress, setContractAddress] = useState(ZeroAddress);
 
-  const [handleBalance, setHandleBalance] = useState('0');
+  const [handleBalance, setHandleBalance] = useState('???');
   const [decryptedBalance, setDecryptedBalance] = useState('???');
 
   const [handles, setHandles] = useState<Uint8Array[]>([]);
@@ -94,10 +94,10 @@ export const Devnet = ({
     if (contractAddress != ZeroAddress) {
       const contract = new ethers.Contract(
         contractAddress,
-        ['function balanceOf(address) view returns (uint256)'],
+        ['function getCounter() view returns (euint8)'],
         readOnlyProvider,
       );
-      const handleBalance = await contract.balanceOf(account);
+      const handleBalance = await contract.getCounter();
       setHandleBalance(handleBalance.toString());
       setDecryptedBalance('???');
     }
@@ -121,6 +121,19 @@ export const Devnet = ({
     } catch (e) {
       console.error('Encryption error:', e);
       console.log(Date.now() - now);
+    }
+  };
+
+  const Increment = async (val: bigint) => {
+    if (contractAddress != ZeroAddress) {
+      const contract = new ethers.Contract(
+        contractAddress,
+        ['function incrementBy(einput, bytes) public'],
+        readOnlyProvider,
+      );
+      encrypt(val);
+      await contract.incrementBy(handles[0], encryption);
+      await getHandleBalance();
     }
   };
 
@@ -199,7 +212,7 @@ export const Devnet = ({
           My decrypted private balance is: {decryptedBalance.toString()}
         </dd>
 
-        <dd className="Devnet__dd">Chose an amount to transfer:</dd>
+        <dd className="Devnet__dd">Chose an amount to add:</dd>
 
         <div>
           <input
@@ -219,15 +232,21 @@ export const Devnet = ({
         <button onClick={() => encrypt(BigInt(chosenValue))}>
           Encrypt {chosenValue}
         </button>
-        <dt className="Devnet__title">
-          This is an encryption of {chosenValue}:
-        </dt>
+        <button onClick={() => Increment(BigInt(chosenValue))}>
+          Add to Balance {chosenValue}
+        </button>
         <dd className="Devnet__dd">
           <pre className="Devnet__pre">
             Handle: {handles.length ? toHexString(handles[0]) : ''}
           </pre>
           <pre className="Devnet__pre">
             Input Proof: {encryption ? toHexString(encryption) : ''}
+          </pre>
+          <pre className="Devnet__pre">
+            Contract Address: {contractAddress}
+          </pre>
+          <pre className="Devnet__pre">
+            Account: {account}
           </pre>
         </dd>
       </dl>
