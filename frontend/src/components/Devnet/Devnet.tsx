@@ -43,10 +43,11 @@ export const Devnet = ({
     if (contractAddress !== ZeroAddress) {
       try {
         // Use readOnly provider for a call
+        const signer = await provider.getSigner(account);
         const contract = new Contract(
           contractAddress,
           ['function getCounter() view returns (uint256)'],
-          readOnlyProvider,
+          signer,
         );
         // ethers v6 -> returns a BigInt
         const res = await contract.getCounter();
@@ -83,23 +84,21 @@ export const Devnet = ({
   const increment = async () => {
     if (contractAddress !== ZeroAddress && handles.length && encryption) {
       try {
-        encrypt(BigInt(inputValue));
         // In v6, getSigner() accepts an address or index
         const signer = await provider.getSigner(account);
-
         const contract = new Contract(
           contractAddress,
-          ['function incrementBy(bytes, bytes) public'],
+          ['function incrementBy(bytes, bytes)'],
           signer
         );
         // Make sure first argument is 32 bytes if the contract expects bytes32
         const tx = await contract.incrementBy(handles[0], encryption);
         await tx.wait();
 
-        // Refresh handle from chain
-        await getHandleBalance();
+        // Refresh handle from chain automatically
+        //await getHandleBalance();
       } catch (error) {
-        console.error('Error calling incrementBy:', error);
+        console.error('Error calling incrementBy: ', error);
       }
     }
   };
@@ -159,6 +158,9 @@ export const Devnet = ({
         </button>
         <button onClick={increment}>
           Increment
+        </button>
+        <button onClick={getHandleBalance}>
+          Get Balance
         </button>
       </div>
       <hr />
